@@ -1,0 +1,4 @@
+[tools]
+elixir = "1.19"
+erlang = "28"
+node = "26"
