@@ -1,0 +1,24 @@
+{
+  "name": "mature-ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mature": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "2.0.106",
+    "ai": "5.0.186",
+    "dotenv": "17.2.3",
+    "zod": "4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "25.7.0",
+    "typescript": "5.9.3"
+  }
+}
