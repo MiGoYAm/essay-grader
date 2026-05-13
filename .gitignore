@@ -2,3 +2,4 @@
 **/dist/
 *.dump
 **/.env
+*.txt
