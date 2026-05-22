@@ -9,13 +9,14 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
+    "preview": "tsc && node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "2.0.106",
-    "ai": "5.0.186",
+    "@ai-sdk/openai": "3.0.63",
+    "ai": "6.0.182",
     "dotenv": "17.2.3",
-    "zod": "4.1.13"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "25.7.0",

@@ -1,7 +1,8 @@
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { defaultModel } from "./model.js";
+import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
 
 export type RangeClass = "szeroki" | "zadowalajacy" | "waski";
 
@@ -17,32 +18,51 @@ export type LanguageResult = {
   points4a: number;
 };
 
-const languageSchema = z.object({
-  range_class: z.enum(["szeroki", "zadowalajacy", "waski"]),
-  language_errors: z.array(
-    z.object({
-      error: z.string(),
-      reasoning: z.string(),
-    }),
-  ),
-});
-
 export async function analyzeLanguage(
   essayText: string,
 ): Promise<LanguageResult> {
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: defaultModel(),
-    schema: languageSchema,
+    output: Output.object({
+      schema: languageSchema(essayText),
+    }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
+    providerOptions: {
+      openai: {
+        reasoningEffort: "medium",
+      } satisfies OpenAIChatLanguageModelOptions,
+    },
   });
 
   return {
-    rangeClass: object.range_class,
-    languageErrors: object.language_errors,
-    bucket: bucketLabel(object.language_errors.length),
-    points4a: points(object.range_class, object.language_errors.length),
+    rangeClass: output.range_class,
+    languageErrors: output.language_errors,
+    bucket: bucketLabel(output.language_errors.length),
+    points4a: points(output.range_class, output.language_errors.length),
   };
+}
+
+function languageSchema(essayText: string) {
+  return z.object({
+    range_class: z.enum(["szeroki", "zadowalajacy", "waski"]),
+    language_errors: z.array(
+      z
+        .object({
+          error: z.string(),
+          reasoning: z.string(),
+        })
+        .superRefine(({ error }, ctx) => {
+          if (!essayText.includes(error)) {
+            ctx.addIssue({
+              code: "custom",
+              message: "'error' not found in the input essay",
+              input: error,
+            });
+          }
+        }),
+    ),
+  });
 }
 
 function points(rangeClass: RangeClass, errorCount: number): number {
@@ -88,22 +108,27 @@ function bucketIndex(errorCount: number): number {
 }
 
 function systemPrompt(): string {
-  return `Oceniasz wypracowanie maturalne z jezyka polskiego wylacznie w kryterium 4a CKE: Zakres i poprawnosc srodkow jezykowych.
+  return `Oceniasz wypracowanie maturalne z języka polskiego wyłącznie w kryterium 4a CKE: zakres i poprawność środków językowych.
 
 Zasady:
-- language_errors to lista bledow jezykowych (fleksyjnych, skladniowych, leksykalnych, frazeologicznych, slowotworczych, stylistycznych).
-- Kazdy wpis w language_errors ma miec error jako dokladny cytat z tekstu oraz reasoning jako krotkie wyjasnienie bledu po polsku.
-- Nie licz bledow ortograficznych ani interpunkcyjnych do language_errors.
-- Uwzglednij wyjasnienia CKE:
-  1) Nie kazde nieprecyzyjne sformulowanie to blad jezykowy.
-  2) Indywidualne preferencje stylistyczne nie moga wplywac na ocene.
-  3) Zroznicowana skladnia: poprawnie uzyte co najmniej 4 rozne struktury skladniowe.
-  4) Zroznicowana leksyka: synonimy, bogata frazeologia, precyzyjne slownictwo/terminologia.
-  5) Nieuzasadnione powtorzenia nie obnizaja klasy zakresu, ale licza sie do bledow jezykowych.`;
+- range_class określa zakres środków językowych: szeroki, zadowalajacy albo waski.
+- language_errors to lista wyłącznie jednoznacznych błędów gramatyczno-składniowych w pracy.
+- Każdy wpis w language_errors ma zawierać:
+  - error: dokładny cytat błędnego słowa, zwrotu lub zdania z tekstu,
+  - reasoning: krótkie wyjaśnienie po polsku, dlaczego cytat zawiera błąd gramatyczno-składniowy.
+- Nie opisuj błędu w polu error. Pole error musi być cytatem z pracy.
+- Uwzględniaj tylko błędy, w których da się wskazać niepoprawną formę gramatyczną, np. błędną zgodność podmiotu z orzeczeniem, błędną zgodność rodzaju, liczby lub przypadku, albo niepoprawną konstrukcję składniową.
+- Nie licz błędów ortograficznych ani interpunkcyjnych do language_errors.
+- Nie licz błędów leksykalnych, znaczeniowych, frazeologicznych, słowotwórczych ani stylistycznych do language_errors.
+- Nie uznawaj za błąd językowy samej nieprecyzyjności, uproszczenia, niezręczności, powtórzenia, słabszego stylu, nieadekwatnego słowa ani indywidualnej preferencji stylistycznej.
+- Nie dodawaj fragmentu do language_errors, jeśli proponowana poprawa dotyczy przecinka, ortografii, trafniejszego słowa, naturalniejszego brzmienia albo lepszego stylu.
+- Jeśli fragment jest poprawny językowo, ale można by go napisać lepiej, nie dodawaj go do language_errors.
+- Ten sam błąd językowy powtórzony w wypracowaniu licz tylko raz.
+- Oceniając range_class, uwzględnij zróżnicowanie składni, zróżnicowanie leksyki, precyzję słownictwa i terminologii oraz poprawność użytych środków językowych.`;
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj to wypracowanie i zwroc wynik:
+  return `Przeanalizuj to wypracowanie i zwróć wynik:
 
 ${essayText}`;
 }

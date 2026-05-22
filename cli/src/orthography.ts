@@ -1,11 +1,12 @@
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { defaultModel } from "./model.js";
+import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
 
 export type ErrorWithReasoning = {
   error: string;
-  reasoning: string;
+  correct: string;
 };
 
 export type OrthographyResult = {
@@ -13,30 +14,41 @@ export type OrthographyResult = {
   points4b: number;
 };
 
-const orthographySchema = z.object({
-  orthography_errors: z.array(
-    z.object({
-      error: z.string(),
-      reasoning: z.string(),
-    }),
-  ),
-});
-
 export async function analyzeOrthography(
   essayText: string,
   opts: { specNeeds?: boolean } = {},
 ): Promise<OrthographyResult> {
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: defaultModel(),
-    schema: orthographySchema,
+    output: Output.array({
+      element: z
+        .object({
+          error: z.string(),
+          correct: z.string(),
+        })
+        .superRefine(({ error }, ctx) => {
+          if (!essayText.includes(error)) {
+            ctx.addIssue({
+              code: "custom",
+              message: "'error' not found in the input essay",
+              input: error,
+            });
+          }
+        }),
+    }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
+    providerOptions: {
+      openai: {
+        reasoningEffort: "medium",
+      } satisfies OpenAIChatLanguageModelOptions,
+    },
   });
 
-  const errorCount = object.orthography_errors.length;
+  const errorCount = output.length;
 
   return {
-    orthographyErrors: object.orthography_errors,
+    orthographyErrors: output,
     points4b: points(errorCount, opts),
   };
 }
@@ -57,16 +69,21 @@ function points(
 }
 
 function systemPrompt(): string {
-  return `Oceniasz wypracowanie maturalne z jezyka polskiego pod kątem poprawnosci ortograficznej.
+  return `Oceniasz wypracowanie maturalne z języka polskiego pod kątem poprawności ortograficznej.
 
 Zasady:
-- orthography_errors to lista bledow ortograficznych w pracy.
-- Kazdy wpis w orthography_errors ma miec error jako dokladny cytat z tekstu oraz reasoning jako krotkie wyjasnienie bledu po polsku.
-- Ten sam wyraz zapisany niepoprawnie ortograficznie, powtorzony w wypracowaniu, pomiń ten błąd.`;
+- orthography_errors to lista błędów ortograficznych w pracy.
+- Każdy wpis w orthography_errors ma zawierać:
+  - error: dokładny cytat błędnie zapisanego słowa lub zwrotu z tekstu,
+  - correct: poprawną formę tego słowa lub zwrotu.
+- Nie opisuj błędu w polu error. Pole error musi być cytatem z pracy.
+- Nie dodawaj wyjaśnień ani komentarzy.
+- Uwzględniaj tylko błędy ortograficzne, nie interpunkcyjne, stylistyczne ani gramatyczne.
+- Ten sam wyraz lub zwrot zapisany niepoprawnie ortograficznie, powtórzony w wypracowaniu, licz tylko raz.`;
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj to wypracowanie i zwroc wynik:
+  return `Przeanalizuj to wypracowanie i zwróć wynik:
 
 ${essayText}`;
 }
