@@ -1,11 +1,13 @@
 import type { LanguageResult } from "./language.js";
 import type { OrthographyResult } from "./orthography.js";
 import type { PunctuationResult } from "./punctuation.js";
+import type { StyleResult } from "./style.js";
 
 export function renderTable(
   language: LanguageResult,
   orthography: OrthographyResult,
   punctuation: PunctuationResult,
+  style: StyleResult,
 ): string {
   const rows4a = [
     ["Kryterium", "4a Zakres i poprawnosc srodkow jezykowych"],
@@ -21,17 +23,28 @@ export function renderTable(
     ["Punkty 4b", orthography.points4b.toString()],
   ];
 
+  const rows3c = [
+    ["Kryterium", "3c Styl wypowiedzi"],
+    ["Ocena", style.styleClass === "stosowny" ? "stosowny" : "niestosowny"],
+    ["Punkty 3c", style.points3c.toString()],
+  ];
+
   const rowsPunct = [
     ["Kryterium", "Interpunkcja (informacyjnie)"],
     ["Bledy interpunkcyjne", punctuation.punctuationErrors.length.toString()],
   ];
 
   const totalRows = [
-    ["Suma czesciowa", "4a + 4b"],
-    ["Punkty", (language.points4a + orthography.points4b).toString()],
+    ["Suma czesciowa", "3c + 4a + 4b"],
+    ["Punkty", (style.points3c + language.points4a + orthography.points4b).toString()],
   ];
 
   return [
+    drawTable(rows3c),
+    "",
+    "Problemy stylistyczne (3c):",
+    renderStyleIssues(style.issues),
+    "",
     drawTable(rows4a),
     "",
     "Bledy jezykowe (4a):",
@@ -82,6 +95,21 @@ function renderPunctuationErrors(
     .map((error, index) => {
       return `${index + 1}. Pozycja ${error.position}: "${error.fragment}" → "${error.suggestion}" — ${error.reasoning}`;
     })
+    .join("\n");
+}
+
+function renderStyleIssues(
+  issues: { issue: string; fragment: string; reasoning: string }[],
+): string {
+  if (issues.length === 0) {
+    return "Brak.";
+  }
+
+  return issues
+    .map(
+      (item, index) =>
+        `${index + 1}. ${item.issue}: "${item.fragment}" — ${item.reasoning}`,
+    )
     .join("\n");
 }
 
