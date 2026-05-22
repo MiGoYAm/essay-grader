@@ -1,9 +1,11 @@
 import type { LanguageResult } from "./language.js";
 import type { OrthographyResult } from "./orthography.js";
+import type { PunctuationResult } from "./punctuation.js";
 
 export function renderTable(
   language: LanguageResult,
   orthography: OrthographyResult,
+  punctuation: PunctuationResult,
 ): string {
   const rows4a = [
     ["Kryterium", "4a Zakres i poprawnosc srodkow jezykowych"],
@@ -17,6 +19,11 @@ export function renderTable(
     ["Kryterium", "4b Poprawnosc ortograficzna"],
     ["Bledy ortograficzne", orthography.orthographyErrors.length.toString()],
     ["Punkty 4b", orthography.points4b.toString()],
+  ];
+
+  const rowsPunct = [
+    ["Kryterium", "Interpunkcja (informacyjnie)"],
+    ["Bledy interpunkcyjne", punctuation.punctuationErrors.length.toString()],
   ];
 
   const totalRows = [
@@ -35,6 +42,11 @@ export function renderTable(
     "Bledy ortograficzne (4b):",
     renderErrors(orthography.orthographyErrors),
     "",
+    drawTable(rowsPunct),
+    "",
+    "Bledy interpunkcyjne:",
+    renderPunctuationErrors(punctuation.punctuationErrors),
+    "",
     drawTable(totalRows),
   ].join("\n");
 }
@@ -51,6 +63,25 @@ function renderErrors(
       (error, index) =>
         `${index + 1}. "${error.error}" - ${error.correct ?? error.reasoning}`,
     )
+    .join("\n");
+}
+
+function renderPunctuationErrors(
+  errors: {
+    fragment: string;
+    suggestion: string;
+    reasoning: string;
+    position: number;
+  }[],
+): string {
+  if (errors.length === 0) {
+    return "Brak.";
+  }
+
+  return errors
+    .map((error, index) => {
+      return `${index + 1}. Pozycja ${error.position}: "${error.fragment}" → "${error.suggestion}" — ${error.reasoning}`;
+    })
     .join("\n");
 }
 
