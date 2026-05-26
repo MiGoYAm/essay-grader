@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 
+import { analyzeCoherence } from './coherence.js';
 import { analyzeLanguage } from './language.js';
 import { analyzeOrthography } from './orthography.js';
 import { analyzePunctuation } from './punctuation.js';
@@ -21,14 +22,15 @@ async function main(argv: string[]): Promise<void> {
 
   validateEnv();
   const essayText = await readEssay(parsed.filePath);
-  const [language, orthography, punctuation, style] = await Promise.all([
+  const [language, orthography, punctuation, style, coherence] = await Promise.all([
     analyzeLanguage(essayText),
     analyzeOrthography(essayText, { specNeeds: parsed.opts.specNeeds }),
     analyzePunctuation(essayText),
     analyzeStyle(essayText),
+    analyzeCoherence(essayText),
   ]);
 
-  console.log(renderTable(language, orthography, punctuation, style));
+  console.log(renderTable(language, orthography, punctuation, style, coherence));
 }
 
 function parseArgs(argv: string[]): { filePath: string; opts: CliOptions } | null {

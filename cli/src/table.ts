@@ -1,3 +1,4 @@
+import type { CoherenceResult } from "./coherence.js";
 import type { LanguageResult } from "./language.js";
 import type { OrthographyResult } from "./orthography.js";
 import type { PunctuationResult } from "./punctuation.js";
@@ -8,6 +9,7 @@ export function renderTable(
   orthography: OrthographyResult,
   punctuation: PunctuationResult,
   style: StyleResult,
+  coherence: CoherenceResult,
 ): string {
   const rows4a = [
     ["Kryterium", "4a Zakres i poprawnosc srodkow jezykowych"],
@@ -23,6 +25,15 @@ export function renderTable(
     ["Punkty 4b", orthography.points4b.toString()],
   ];
 
+  const rows3b = [
+    ["Kryterium", "3b Spojnosc wypowiedzi"],
+    ["Poziom", coherence.level],
+    ["Zaburzenia", coherence.disturbanceCount.toString()],
+    ["Wstep spójny", coherence.introCoherent ? "tak" : "nie"],
+    ["Zakonczenie spojne", coherence.conclusionCoherent ? "tak" : "nie"],
+    ["Punkty 3b", coherence.points3b.toString()],
+  ];
+
   const rows3c = [
     ["Kryterium", "3c Styl wypowiedzi"],
     ["Ocena", style.styleClass === "stosowny" ? "stosowny" : "niestosowny"],
@@ -35,11 +46,16 @@ export function renderTable(
   ];
 
   const totalRows = [
-    ["Suma czesciowa", "3c + 4a + 4b"],
-    ["Punkty", (style.points3c + language.points4a + orthography.points4b).toString()],
+    ["Suma czesciowa", "3b + 3c + 4a + 4b"],
+    ["Punkty", (coherence.points3b + style.points3c + language.points4a + orthography.points4b).toString()],
   ];
 
   return [
+    drawTable(rows3b),
+    "",
+    `Zaburzenia spojnosci (3b): ${coherence.reasoning}`,
+    renderCoherenceDisturbances(coherence.disturbances),
+    "",
     drawTable(rows3c),
     "",
     "Problemy stylistyczne (3c):",
@@ -95,6 +111,21 @@ function renderPunctuationErrors(
     .map((error, index) => {
       return `${index + 1}. Pozycja ${error.position}: "${error.fragment}" → "${error.suggestion}" — ${error.reasoning}`;
     })
+    .join("\n");
+}
+
+function renderCoherenceDisturbances(
+  disturbances: { issue: string; fragment: string; reasoning: string }[],
+): string {
+  if (disturbances.length === 0) {
+    return "Brak.";
+  }
+
+  return disturbances
+    .map(
+      (item, index) =>
+        `${index + 1}. ${item.issue}: "${item.fragment}" — ${item.reasoning}`,
+    )
     .join("\n");
 }
 
