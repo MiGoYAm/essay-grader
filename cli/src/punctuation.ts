@@ -1,8 +1,12 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 
-import { defaultModel } from "./model.js";
-import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
+import {
+  assignUniqueFragmentPositions,
+  essayFragment,
+  essayPrompt,
+  runAnalyzer,
+} from "./analyzer.js";
 
 export type PunctuationErrorRaw = {
   fragment: string;
@@ -18,61 +22,71 @@ export type PunctuationResult = {
   punctuationErrors: PunctuationError[];
 };
 
+type PunctuationModelError = PunctuationErrorRaw & {
+  occurrence_index?: number;
+};
+
 export async function analyzePunctuation(
   essayText: string,
 ): Promise<PunctuationResult> {
-  const { output } = await generateText({
-    model: defaultModel(),
+  const output = await runAnalyzer<PunctuationModelError[]>({
     output: Output.array({
       element: punctuationSchema(essayText),
     }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "xhigh",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
+    reasoningEffort: "xhigh",
   });
 
-  const punctuationErrors = output.map((error) => ({
-    ...error,
-    position: calculatePosition(essayText, error),
-  }));
-
-  return { punctuationErrors };
+  return { punctuationErrors: positionPunctuationErrors(essayText, output) };
 }
 
 function punctuationSchema(essayText: string) {
-  return z
-    .object({
-      fragment: z.string().min(2),
-      suggestion: z.string().min(2),
-      reasoning: z.string(),
-    })
-    .superRefine(({ fragment }, ctx) => {
-      if (!essayText.includes(fragment)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "'fragment' not found in the input essay",
-        });
-      }
-    });
+  return z.object({
+    fragment: essayFragment(essayText, "fragment", { minLength: 2 }),
+    suggestion: z.string().min(2),
+    reasoning: z.string(),
+    occurrence_index: z.number().int().min(1).optional(),
+  });
 }
 
-function calculatePosition(
+export function positionPunctuationErrors(
   essayText: string,
-  error: PunctuationErrorRaw,
-): number {
-  const idx = essayText.indexOf(error.fragment);
-  if (idx === -1) return -1;
+  errors: PunctuationModelError[],
+): PunctuationError[] {
+  return assignUniqueFragmentPositions(
+    essayText,
+    errors.map((error) => ({
+      ...error,
+      occurrenceIndex: error.occurrence_index,
+    })),
+  ).map((error) => {
+    const {
+      occurrence_index: _occurrenceIndexRaw,
+      occurrenceIndex: _occurrenceIndex,
+      fragmentPosition,
+      ...publicError
+    } = error;
 
-  const minLen = Math.min(error.fragment.length, error.suggestion.length);
+    return {
+      ...publicError,
+      position:
+        fragmentPosition +
+        punctuationChangeOffset(error.fragment, error.suggestion),
+    };
+  });
+}
+
+export function punctuationChangeOffset(
+  fragment: string,
+  suggestion: string,
+): number {
+  const minLen = Math.min(fragment.length, suggestion.length);
   for (let i = 0; i < minLen; i++) {
-    if (error.fragment[i] !== error.suggestion[i]) return idx + i;
+    if (fragment[i] !== suggestion[i]) return i;
   }
 
-  return idx + minLen;
+  return minLen;
 }
 
 function systemPrompt(): string {
@@ -83,13 +97,13 @@ Zasady:
 - Dla KAŻDEGO wystąpienia błędu utwórz osobny wpis (licz osobno nawet powtórzone błędy, bo każdy ma inną pozycję).
 - "fragment" to cytat z tekstu zawierający błąd (minimum 2-3 słowa dla jednoznaczności).
 - "suggestion" to fragment po poprawce (z dodanym/usuniętym znakiem).
-- "type" to "missing" gdy brakuje znaku, "extraneous" gdy znak jest zbędny.
 - "reasoning" to krótkie wyjaśnienie po polsku, dlaczego to błąd interpunkcyjny.
+- "occurrence_index" to opcjonalny numer wystąpienia tego samego fragmentu w tekście, liczony od 1. Dodaj go tylko wtedy, gdy identyczny fragment występuje w tekście więcej niż raz.
 
 Przykłady:
-- Brak przecinka: fragment="smartfonów które", suggestion="smartfonów, które", type="missing"
-- Brak przecinka: fragment="zatem musimy", suggestion="zatem, musimy", type="missing"
-- Zbędny przecinek: fragment="Kasia, która", suggestion="Kasia która", type="extraneous"
+- Brak przecinka: fragment="smartfonów które", suggestion="smartfonów, które"
+- Brak przecinka: fragment="zatem musimy", suggestion="zatem, musimy"
+- Zbędny przecinek: fragment="Kasia, która", suggestion="Kasia która"
 
 Wykrywaj brakujące lub zbędne:
 - przecinek (,)
@@ -106,7 +120,8 @@ Nie zgłaszaj:
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj to wypracowanie i znajdź wszystkie błędy interpunkcyjne:
-
-${essayText}`;
+  return essayPrompt(
+    "Przeanalizuj to wypracowanie i znajdź wszystkie błędy interpunkcyjne",
+    essayText,
+  );
 }

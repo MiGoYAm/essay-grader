@@ -10,6 +10,7 @@
     "build": "tsc",
     "start": "node dist/cli.js",
     "preview": "tsc && node dist/cli.js",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "25.7.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.7"
   }
 }

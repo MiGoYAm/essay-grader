@@ -1,8 +1,7 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 
-import { defaultModel } from "./model.js";
-import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
+import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
 
 export type CoherenceLevel = "pelna" | "czesciowa" | "nieodpowiednia" | "brak";
 
@@ -22,66 +21,74 @@ export type CoherenceResult = {
   points3b: number;
 };
 
+type CoherenceModelOutput = {
+  reasoning: string;
+  disturbances: CoherenceDisturbance[];
+  intro_coherent: boolean;
+  conclusion_coherent: boolean;
+};
+
 export async function analyzeCoherence(
   essayText: string,
 ): Promise<CoherenceResult> {
-  const { output } = await generateText({
-    model: defaultModel(),
+  const output = await runAnalyzer<CoherenceModelOutput>({
     output: Output.object({
       schema: coherenceSchema(essayText),
     }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "medium",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
   });
+  const disturbanceCount = output.disturbances.length;
+  const level = deriveCoherenceLevel(
+    disturbanceCount,
+    output.intro_coherent,
+    output.conclusion_coherent,
+  );
 
   return {
-    level: output.level,
+    level,
     reasoning: output.reasoning,
-    disturbanceCount: output.disturbance_count,
+    disturbanceCount,
     disturbances: output.disturbances,
     introCoherent: output.intro_coherent,
     conclusionCoherent: output.conclusion_coherent,
-    points3b: points(output.level, output.intro_coherent, output.conclusion_coherent),
+    points3b: scoreCoherence(level),
   };
 }
 
 function coherenceSchema(essayText: string) {
   return z.object({
-    level: z.enum(["pelna", "czesciowa", "nieodpowiednia", "brak"]),
     reasoning: z.string(),
-    disturbance_count: z.number().int().min(0),
     intro_coherent: z.boolean(),
     conclusion_coherent: z.boolean(),
     disturbances: z.array(
-      z
-        .object({
-          issue: z.string(),
-          fragment: z.string(),
-          reasoning: z.string(),
-        })
-        .superRefine(({ fragment }, ctx) => {
-          if (!essayText.includes(fragment)) {
-            ctx.addIssue({
-              code: "custom",
-              message: "'fragment' not found in the input essay",
-              input: fragment,
-            });
-          }
-        }),
+      z.object({
+        issue: z.string(),
+        fragment: essayFragment(essayText, "fragment"),
+        reasoning: z.string(),
+      }),
     ),
   });
 }
 
-function points(
-  level: CoherenceLevel,
+export function deriveCoherenceLevel(
+  disturbanceCount: number,
   introCoherent: boolean,
   conclusionCoherent: boolean,
-): number {
+): CoherenceLevel {
+  if (disturbanceCount >= 9 || (!introCoherent && !conclusionCoherent)) {
+    return "brak";
+  }
+
+  if (disturbanceCount >= 6 || !introCoherent || !conclusionCoherent) {
+    return "nieodpowiednia";
+  }
+
+  if (disturbanceCount >= 3) return "czesciowa";
+  return "pelna";
+}
+
+export function scoreCoherence(level: CoherenceLevel): number {
   if (level === "brak") return 0;
   if (level === "nieodpowiednia") return 1;
   if (level === "czesciowa") return 2;
@@ -117,7 +124,6 @@ Poziomy oceny:
 - "brak" (0 pkt): w wypowiedzi występuje 9 lub więcej zaburzeń w spójności LUB wstęp pracy jest treściowo niespójny z częścią zasadniczą pracy ORAZ z zakończeniem pracy LUB zakończenie pracy jest treściowo niespójne z wstępem ORAZ częścią zasadniczą pracy.
 
 Zasady:
-- "disturbance_count" to łączna liczba zaburzeń spójności znalezionych w pracy.
 - "intro_coherent" określa, czy wstęp pracy jest logicznie spójny z częścią zasadniczą.
 - "conclusion_coherent" określa, czy zakończenie pracy jest logicznie spójne z częścią zasadniczą.
 - "reasoning" to krótkie uzasadnienie oceny po polsku.
@@ -131,7 +137,8 @@ Zasady:
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj spójność tego wypracowania i zwróć wynik:
-
-${essayText}`;
+  return essayPrompt(
+    "Przeanalizuj spójność tego wypracowania i zwróć wynik",
+    essayText,
+  );
 }

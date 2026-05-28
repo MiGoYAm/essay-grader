@@ -1,8 +1,7 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 
-import { defaultModel } from "./model.js";
-import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
+import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
 
 export type RangeClass = "szeroki" | "zadowalajacy" | "waski";
 
@@ -18,28 +17,27 @@ export type LanguageResult = {
   points4a: number;
 };
 
+type LanguageModelOutput = {
+  range_class: RangeClass;
+  language_errors: ErrorWithReasoning[];
+};
+
 export async function analyzeLanguage(
   essayText: string,
 ): Promise<LanguageResult> {
-  const { output } = await generateText({
-    model: defaultModel(),
+  const output = await runAnalyzer<LanguageModelOutput>({
     output: Output.object({
       schema: languageSchema(essayText),
     }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "medium",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
   });
 
   return {
     rangeClass: output.range_class,
     languageErrors: output.language_errors,
-    bucket: bucketLabel(output.language_errors.length),
-    points4a: points(output.range_class, output.language_errors.length),
+    bucket: languageBucketLabel(output.language_errors.length),
+    points4a: scoreLanguage(output.range_class, output.language_errors.length),
   };
 }
 
@@ -47,36 +45,26 @@ function languageSchema(essayText: string) {
   return z.object({
     range_class: z.enum(["szeroki", "zadowalajacy", "waski"]),
     language_errors: z.array(
-      z
-        .object({
-          error: z.string(),
-          reasoning: z.string(),
-        })
-        .superRefine(({ error }, ctx) => {
-          if (!essayText.includes(error)) {
-            ctx.addIssue({
-              code: "custom",
-              message: "'error' not found in the input essay",
-              input: error,
-            });
-          }
-        }),
+      z.object({
+        error: essayFragment(essayText, "error"),
+        reasoning: z.string(),
+      }),
     ),
   });
 }
 
-function points(rangeClass: RangeClass, errorCount: number): number {
+export function scoreLanguage(rangeClass: RangeClass, errorCount: number): number {
   const matrix: Record<RangeClass, number[]> = {
     szeroki: [5, 4, 3, 2, 1, 0, 0, 0],
     zadowalajacy: [4, 3, 2, 1, 0, 0, 0, 0],
     waski: [3, 2, 1, 0, 0, 0, 0, 0],
   } as const;
 
-  return matrix[rangeClass][bucketIndex(errorCount)] ?? 0;
+  return matrix[rangeClass][languageBucketIndex(errorCount)] ?? 0;
 }
 
-function bucketLabel(errorCount: number): string {
-  switch (bucketIndex(errorCount)) {
+export function languageBucketLabel(errorCount: number): string {
+  switch (languageBucketIndex(errorCount)) {
     case 0:
       return "<=5";
     case 1:
@@ -96,7 +84,7 @@ function bucketLabel(errorCount: number): string {
   }
 }
 
-function bucketIndex(errorCount: number): number {
+export function languageBucketIndex(errorCount: number): number {
   if (errorCount <= 5) return 0;
   if (errorCount <= 8) return 1;
   if (errorCount <= 11) return 2;
@@ -128,7 +116,5 @@ Zasady:
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj to wypracowanie i zwróć wynik:
-
-${essayText}`;
+  return essayPrompt("Przeanalizuj to wypracowanie i zwróć wynik", essayText);
 }

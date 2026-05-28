@@ -1,8 +1,7 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 
-import { defaultModel } from "./model.js";
-import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
+import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
 
 export type ErrorWithReasoning = {
   error: string;
@@ -18,42 +17,26 @@ export async function analyzeOrthography(
   essayText: string,
   opts: { specNeeds?: boolean } = {},
 ): Promise<OrthographyResult> {
-  const { output } = await generateText({
-    model: defaultModel(),
+  const output = await runAnalyzer<ErrorWithReasoning[]>({
     output: Output.array({
-      element: z
-        .object({
-          error: z.string(),
-          correct: z.string(),
-        })
-        .superRefine(({ error }, ctx) => {
-          if (!essayText.includes(error)) {
-            ctx.addIssue({
-              code: "custom",
-              message: "'error' not found in the input essay",
-              input: error,
-            });
-          }
-        }),
+      element: z.object({
+        error: essayFragment(essayText, "error"),
+        correct: z.string(),
+      }),
     }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "medium",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
   });
 
   const errorCount = output.length;
 
   return {
     orthographyErrors: output,
-    points4b: points(errorCount, opts),
+    points4b: scoreOrthography(errorCount, opts),
   };
 }
 
-function points(
+export function scoreOrthography(
   errorCount: number,
   opts: { specNeeds?: boolean } = {},
 ): number {
@@ -72,8 +55,8 @@ function systemPrompt(): string {
   return `Oceniasz wypracowanie maturalne z języka polskiego pod kątem poprawności ortograficznej.
 
 Zasady:
-- orthography_errors to lista błędów ortograficznych w pracy.
-- Każdy wpis w orthography_errors ma zawierać:
+- Zwróć tablicę błędów ortograficznych w pracy.
+- Każdy wpis ma zawierać:
   - error: dokładny cytat błędnie zapisanego słowa lub zwrotu z tekstu,
   - correct: poprawną formę tego słowa lub zwrotu.
 - Nie opisuj błędu w polu error. Pole error musi być cytatem z pracy.
@@ -83,7 +66,5 @@ Zasady:
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj to wypracowanie i zwróć wynik:
-
-${essayText}`;
+  return essayPrompt("Przeanalizuj to wypracowanie i zwróć wynik", essayText);
 }

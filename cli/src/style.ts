@@ -1,8 +1,7 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 
-import { defaultModel } from "./model.js";
-import { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
+import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
 
 export type StyleClass = "stosowny" | "niestosowny";
 
@@ -18,21 +17,20 @@ export type StyleResult = {
   points3c: number;
 };
 
+type StyleModelOutput = {
+  style_class: StyleClass;
+  issues: StyleIssue[];
+};
+
 export async function analyzeStyle(
   essayText: string,
 ): Promise<StyleResult> {
-  const { output } = await generateText({
-    model: defaultModel(),
+  const output = await runAnalyzer<StyleModelOutput>({
     output: Output.object({
       schema: styleSchema(essayText),
     }),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "medium",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
   });
 
   return {
@@ -46,21 +44,11 @@ function styleSchema(essayText: string) {
   return z.object({
     style_class: z.enum(["stosowny", "niestosowny"]),
     issues: z.array(
-      z
-        .object({
-          issue: z.string(),
-          fragment: z.string(),
-          reasoning: z.string(),
-        })
-        .superRefine(({ fragment }, ctx) => {
-          if (!essayText.includes(fragment)) {
-            ctx.addIssue({
-              code: "custom",
-              message: "'fragment' not found in the input essay",
-              input: fragment,
-            });
-          }
-        }),
+      z.object({
+        issue: z.string(),
+        fragment: essayFragment(essayText, "fragment"),
+        reasoning: z.string(),
+      }),
     ),
   });
 }
@@ -97,7 +85,5 @@ Zasady:
 }
 
 function userPrompt(essayText: string): string {
-  return `Przeanalizuj styl tego wypracowania i zwróć wynik:
-
-${essayText}`;
+  return essayPrompt("Przeanalizuj styl tego wypracowania i zwróć wynik", essayText);
 }
