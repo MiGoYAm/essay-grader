@@ -20,6 +20,7 @@ export type PunctuationError = PunctuationErrorRaw & {
 
 export type PunctuationResult = {
   punctuationErrors: PunctuationError[];
+  points4c: number;
 };
 
 type PunctuationModelError = PunctuationErrorRaw & {
@@ -28,6 +29,7 @@ type PunctuationModelError = PunctuationErrorRaw & {
 
 export async function analyzePunctuation(
   essayText: string,
+  opts: { specNeeds?: boolean } = {},
 ): Promise<PunctuationResult> {
   const output = await runAnalyzer<PunctuationModelError[]>({
     output: Output.array({
@@ -38,7 +40,12 @@ export async function analyzePunctuation(
     reasoningEffort: "xhigh",
   });
 
-  return { punctuationErrors: positionPunctuationErrors(essayText, output) };
+  const punctuationErrors = positionPunctuationErrors(essayText, output);
+
+  return {
+    punctuationErrors,
+    points4c: scorePunctuation(punctuationErrors.length, opts),
+  };
 }
 
 function punctuationSchema(essayText: string) {
@@ -87,6 +94,21 @@ export function punctuationChangeOffset(
   }
 
   return minLen;
+}
+
+export function scorePunctuation(
+  errorCount: number,
+  opts: { specNeeds?: boolean } = {},
+): number {
+  if (opts.specNeeds) {
+    if (errorCount <= 15) return 2;
+    if (errorCount <= 30) return 1;
+    return 0;
+  }
+
+  if (errorCount <= 8) return 2;
+  if (errorCount <= 16) return 1;
+  return 0;
 }
 
 function systemPrompt(): string {

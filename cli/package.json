@@ -6,6 +6,12 @@
   "bin": {
     "mature": "./dist/cli.js"
   },
+  "exports": {
+    "./analyze": {
+      "types": "./dist/analyze.d.ts",
+      "default": "./dist/analyze.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",

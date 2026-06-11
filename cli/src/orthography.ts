@@ -24,7 +24,7 @@ export async function analyzeOrthography(
         correct: z.string(),
       }),
     }),
-    system: systemPrompt(),
+    system: systemPrompt(opts),
     prompt: userPrompt(essayText),
   });
 
@@ -51,7 +51,15 @@ export function scoreOrthography(
   }
 }
 
-function systemPrompt(): string {
+function systemPrompt(opts: { specNeeds?: boolean } = {}): string {
+  const specNeedsRules = opts.specNeeds
+    ? `
+Uczen ma stwierdzone specyficzne trudnosci w uczeniu sie. Zgodnie z zasadami CKE licz jako bledy ortograficzne wylacznie:
+- bledy w zapisie wyrazow z u-ó, ż-rz, h-ch,
+- lamanie zasady pisania wielka litera na poczatku zdania.
+Nie licz innych bledow zapisu, np. opuszczania lub przestawiania liter, mylenia liter, brakow znakow diakrytycznych, bledow podzialu wyrazu ani mylenia przyimkow z przedrostkami.`
+    : "";
+
   return `Oceniasz wypracowanie maturalne z języka polskiego pod kątem poprawności ortograficznej.
 
 Zasady:
@@ -62,7 +70,7 @@ Zasady:
 - Nie opisuj błędu w polu error. Pole error musi być cytatem z pracy.
 - Nie dodawaj wyjaśnień ani komentarzy.
 - Uwzględniaj tylko błędy ortograficzne, nie interpunkcyjne, stylistyczne ani gramatyczne.
-- Ten sam wyraz lub zwrot zapisany niepoprawnie ortograficznie, powtórzony w wypracowaniu, licz tylko raz.`;
+- Ten sam wyraz lub zwrot zapisany niepoprawnie ortograficznie, powtórzony w wypracowaniu, licz tylko raz.${specNeedsRules}`;
 }
 
 function userPrompt(essayText: string): string {

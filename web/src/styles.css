@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background:
+    linear-gradient(90deg, rgba(29, 37, 36, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(29, 37, 36, 0.035) 1px, transparent 1px),
+    #fbfaf6;
+  background-size: 28px 28px;
+  color: #1d2524;
+  color-scheme: light;
+  font-family:
+    Aptos,
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(14, 111, 104, 0.42);
+  outline-offset: 3px;
+}

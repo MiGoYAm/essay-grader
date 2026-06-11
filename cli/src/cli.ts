@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 
-import { analyzeCoherence } from './coherence.js';
-import { analyzeLanguage } from './language.js';
-import { analyzeOrthography } from './orthography.js';
-import { analyzePunctuation } from './punctuation.js';
-import { analyzeStyle } from './style.js';
+import { analyzeEssay } from './analyze.js';
 import { renderTable } from './table.js';
 import { readEssay, validateEnv } from './utils.js';
 
 type CliOptions = {
   specNeeds: boolean;
+  topic?: string;
+  requiredReadings: string[];
 };
 
 async function main(argv: string[]): Promise<void> {
@@ -22,24 +20,36 @@ async function main(argv: string[]): Promise<void> {
 
   validateEnv();
   const essayText = await readEssay(parsed.filePath);
-  const [language, orthography, punctuation, style, coherence] = await Promise.all([
-    analyzeLanguage(essayText),
-    analyzeOrthography(essayText, { specNeeds: parsed.opts.specNeeds }),
-    analyzePunctuation(essayText),
-    analyzeStyle(essayText),
-    analyzeCoherence(essayText),
-  ]);
+  const analysis = await analyzeEssay(
+    essayText,
+    {
+      specNeeds: parsed.opts.specNeeds,
+      taskContext: {
+        topic: parsed.opts.topic,
+        requiredReadings: parsed.opts.requiredReadings,
+      },
+    },
+  );
 
-  console.log(renderTable(language, orthography, punctuation, style, coherence));
+  console.log(renderTable(analysis));
 }
 
 function parseArgs(argv: string[]): { filePath: string; opts: CliOptions } | null {
-  const opts: CliOptions = { specNeeds: false };
+  const opts: CliOptions = { specNeeds: false, requiredReadings: [] };
   const args: string[] = [];
 
-  for (const arg of argv) {
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index]!;
     if (arg === '--spec-needs' || arg === '-s') {
       opts.specNeeds = true;
+    } else if (arg === '--topic') {
+      const topic = argv[++index];
+      if (!topic) return null;
+      opts.topic = topic;
+    } else if (arg === '--required-reading') {
+      const reading = argv[++index];
+      if (!reading) return null;
+      opts.requiredReadings.push(reading);
     } else if (arg.startsWith('-')) {
       return null;
     } else {
@@ -55,8 +65,9 @@ function parseArgs(argv: string[]): { filePath: string; opts: CliOptions } | nul
 }
 
 function usageAndExit(code: number): never {
-  console.log('Uzycie: mature [--spec-needs] path/to/wypracowanie.txt');
+  console.log('Uzycie: mature [--spec-needs] [--topic "..."] [--required-reading "..."] path/to/wypracowanie.txt');
   console.log('Opcje: --spec-needs, -s (progi CKE dla dysleksji/dysortografii/dysgrafii)');
+  console.log('Opcje: --topic temat, --required-reading lektura (mozna powtarzac)');
   console.log('Wymagane: OPENAI_API_KEY');
   process.exit(code);
 }

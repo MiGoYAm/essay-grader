@@ -55,9 +55,9 @@ function languageSchema(essayText: string) {
 
 export function scoreLanguage(rangeClass: RangeClass, errorCount: number): number {
   const matrix: Record<RangeClass, number[]> = {
-    szeroki: [5, 4, 3, 2, 1, 0, 0, 0],
-    zadowalajacy: [4, 3, 2, 1, 0, 0, 0, 0],
-    waski: [3, 2, 1, 0, 0, 0, 0, 0],
+    szeroki: [7, 6, 5, 4, 3, 2, 1, 0],
+    zadowalajacy: [6, 5, 4, 3, 2, 1, 0, 0],
+    waski: [5, 4, 3, 2, 1, 0, 0, 0],
   } as const;
 
   return matrix[rangeClass][languageBucketIndex(errorCount)] ?? 0;
@@ -100,15 +100,13 @@ function systemPrompt(): string {
 
 Zasady:
 - range_class określa zakres środków językowych: szeroki, zadowalajacy albo waski.
-- language_errors to lista wyłącznie jednoznacznych błędów gramatyczno-składniowych w pracy.
+- language_errors to lista jednoznacznych błędów językowych w pracy: fleksyjnych, składniowych, leksykalnych, frazeologicznych, słowotwórczych lub stylistycznych.
 - Każdy wpis w language_errors ma zawierać:
   - error: dokładny cytat błędnego słowa, zwrotu lub zdania z tekstu,
-  - reasoning: krótkie wyjaśnienie po polsku, dlaczego cytat zawiera błąd gramatyczno-składniowy.
+  - reasoning: krótkie wyjaśnienie po polsku, jaki typ błędu językowego zawiera cytat i dlaczego narusza normę językową.
 - Nie opisuj błędu w polu error. Pole error musi być cytatem z pracy.
-- Uwzględniaj tylko błędy, w których da się wskazać niepoprawną formę gramatyczną, np. błędną zgodność podmiotu z orzeczeniem, błędną zgodność rodzaju, liczby lub przypadku, albo niepoprawną konstrukcję składniową.
 - Nie licz błędów ortograficznych ani interpunkcyjnych do language_errors.
-- Nie licz błędów leksykalnych, znaczeniowych, frazeologicznych, słowotwórczych ani stylistycznych do language_errors.
-- Nie uznawaj za błąd językowy samej nieprecyzyjności, uproszczenia, niezręczności, powtórzenia, słabszego stylu, nieadekwatnego słowa ani indywidualnej preferencji stylistycznej.
+- Nie uznawaj za błąd językowy samej nieprecyzyjności, uproszczenia, niezręczności, słabszego stylu ani indywidualnej preferencji stylistycznej, jeśli nie ma oczywistego nieuzasadnionego naruszenia obowiązującej normy językowej.
 - Nie dodawaj fragmentu do language_errors, jeśli proponowana poprawa dotyczy przecinka, ortografii, trafniejszego słowa, naturalniejszego brzmienia albo lepszego stylu.
 - Jeśli fragment jest poprawny językowo, ale można by go napisać lepiej, nie dodawaj go do language_errors.
 - Ten sam błąd językowy powtórzony w wypracowaniu licz tylko raz.
