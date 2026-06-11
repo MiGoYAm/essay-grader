@@ -1,5 +1,6 @@
 const express = require('express')
 const app = express()
+const cors = require('cors')
 require('dotenv').config()
 const multer = require('multer')
 const storage = multer.memoryStorage()
@@ -16,7 +17,9 @@ const { analyzeOrthography } = require("../cli/dist/orthography.js")
 const { analyzePunctuation } = require("../cli/dist/punctuation.js")
 const { validateEnv, readEssay } = require("../cli/dist/utils.js")
 
-app.post('/', async (req, res) => {
+app.use(cors())
+
+app.post('/', upload.none(), async (req, res) => {
   const { text, specNeeds } = req.body;
   const [language, orthography, punctuation] = await Promise.all([
     analyzeLanguage(text),
