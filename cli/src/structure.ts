@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -30,9 +29,7 @@ export async function analyzeStructure(
   essayText: string,
 ): Promise<StructureResult> {
   const output = await runAnalyzer<StructureModelOutput>({
-    output: Output.object({
-      schema: structureSchema(essayText),
-    }),
+    schema: structureSchema(essayText),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
   });

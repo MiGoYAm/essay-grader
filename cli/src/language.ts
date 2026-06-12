@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -26,9 +25,7 @@ export async function analyzeLanguage(
   essayText: string,
 ): Promise<LanguageResult> {
   const output = await runAnalyzer<LanguageModelOutput>({
-    output: Output.object({
-      schema: languageSchema(essayText),
-    }),
+    schema: languageSchema(essayText),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
   });

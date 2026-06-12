@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -18,11 +17,10 @@ export async function analyzeOrthography(
   opts: { specNeeds?: boolean } = {},
 ): Promise<OrthographyResult> {
   const output = await runAnalyzer<ErrorWithReasoning[]>({
-    output: Output.array({
-      element: z.object({
-        error: essayFragment(essayText, "error"),
-        correct: z.string(),
-      }),
+    output: "array",
+    schema: z.object({
+      error: essayFragment(essayText, "error"),
+      correct: z.string(),
     }),
     system: systemPrompt(opts),
     prompt: userPrompt(essayText),

@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -47,12 +46,9 @@ export async function analyzeLiteraryCompetence(
   context: EssayTaskContext = {},
 ): Promise<LiteraryResult> {
   const output = await runAnalyzer<LiteraryModelOutput>({
-    output: Output.object({
-      schema: literarySchema(essayText),
-    }),
+    schema: literarySchema(essayText),
     system: systemPrompt(context),
     prompt: userPrompt(essayText),
-    reasoningEffort: "xhigh",
   });
   const basePoints2 = scoreLiteraryBase(
     output.workUseLevel,

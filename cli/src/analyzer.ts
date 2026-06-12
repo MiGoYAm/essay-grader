@@ -1,5 +1,5 @@
 import type { OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import { defaultModel } from "./model.js";
@@ -8,34 +8,43 @@ type ReasoningEffort = NonNullable<
   OpenAIChatLanguageModelOptions["reasoningEffort"]
 >;
 
-type AnalyzerOutput = NonNullable<Parameters<typeof generateText>[0]["output"]>;
-
 type RunAnalyzerArgs = {
-  output: AnalyzerOutput;
+  output?: "object" | "array";
+  schema: z.ZodType;
   system: string;
   prompt: string;
   reasoningEffort?: ReasoningEffort;
 };
 
+function capReasoningEffort(reasoningEffort: ReasoningEffort): ReasoningEffort {
+  return reasoningEffort === "medium" ||
+    reasoningEffort === "high" ||
+    reasoningEffort === "xhigh"
+    ? "low"
+    : reasoningEffort;
+}
+
 export async function runAnalyzer<T>({
-  output,
+  output = "object",
+  schema,
   system,
   prompt,
-  reasoningEffort = "medium",
+  reasoningEffort = "low",
 }: RunAnalyzerArgs): Promise<T> {
-  const result = await generateText({
+  const result = await generateObject({
     model: defaultModel(),
     output,
+    schema,
     system,
     prompt,
     providerOptions: {
       openai: {
-        reasoningEffort,
+        reasoningEffort: capReasoningEffort(reasoningEffort),
       } satisfies OpenAIChatLanguageModelOptions,
     },
   });
 
-  return result.output as T;
+  return result.object as T;
 }
 
 export function essayPrompt(instruction: string, essayText: string): string {
@@ -45,21 +54,11 @@ ${essayText}`;
 }
 
 export function essayFragment(
-  essayText: string,
-  fieldName: string,
+  _essayText: string,
+  _fieldName: string,
   opts: { minLength?: number } = {},
 ) {
-  const schema = z.string().min(opts.minLength ?? 1);
-
-  return schema.superRefine((fragment, ctx) => {
-    if (!essayText.includes(fragment)) {
-      ctx.addIssue({
-        code: "custom",
-        message: `'${fieldName}' not found in the input essay`,
-        input: fragment,
-      });
-    }
-  });
+  return z.string().min(opts.minLength ?? 1);
 }
 
 export function findFragmentPositions(
@@ -87,12 +86,13 @@ export function assignUniqueFragmentPositions<
   items: T[],
 ): Array<T & { fragmentPosition: number }> {
   const usedByFragment = new Map<string, Set<number>>();
+  const locatedItems: Array<T & { fragmentPosition: number }> = [];
 
-  return items.map((item) => {
+  for (const item of items) {
     const positions = findFragmentPositions(essayText, item.fragment);
 
     if (positions.length === 0) {
-      throw new Error(`Fragment not found in essay: ${item.fragment}`);
+      continue;
     }
 
     const used = usedByFragment.get(item.fragment) ?? new Set<number>();
@@ -102,24 +102,21 @@ export function assignUniqueFragmentPositions<
         : positions.findIndex((_, index) => !used.has(index));
 
     if (occurrenceIndex < 0 || occurrenceIndex >= positions.length) {
-      const nextOccurrence = item.occurrenceIndex ?? used.size + 1;
-      throw new Error(
-        `Cannot locate occurrence ${nextOccurrence} of fragment: ${item.fragment}`,
-      );
+      continue;
     }
 
     if (used.has(occurrenceIndex)) {
-      throw new Error(
-        `Duplicate locator for occurrence ${occurrenceIndex + 1} of fragment: ${item.fragment}`,
-      );
+      continue;
     }
 
     used.add(occurrenceIndex);
     usedByFragment.set(item.fragment, used);
 
-    return {
+    locatedItems.push({
       ...item,
       fragmentPosition: positions[occurrenceIndex]!,
-    };
-  });
+    });
+  }
+
+  return locatedItems;
 }

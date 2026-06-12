@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -32,9 +31,7 @@ export async function analyzeCoherence(
   essayText: string,
 ): Promise<CoherenceResult> {
   const output = await runAnalyzer<CoherenceModelOutput>({
-    output: Output.object({
-      schema: coherenceSchema(essayText),
-    }),
+    schema: coherenceSchema(essayText),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
   });

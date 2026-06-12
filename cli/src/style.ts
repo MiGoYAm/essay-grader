@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -26,9 +25,7 @@ export async function analyzeStyle(
   essayText: string,
 ): Promise<StyleResult> {
   const output = await runAnalyzer<StyleModelOutput>({
-    output: Output.object({
-      schema: styleSchema(essayText),
-    }),
+    schema: styleSchema(essayText),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
   });

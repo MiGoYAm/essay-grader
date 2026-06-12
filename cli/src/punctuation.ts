@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import {
@@ -24,7 +23,7 @@ export type PunctuationResult = {
 };
 
 type PunctuationModelError = PunctuationErrorRaw & {
-  occurrence_index?: number;
+  occurrence_index: number | null;
 };
 
 export async function analyzePunctuation(
@@ -32,12 +31,10 @@ export async function analyzePunctuation(
   opts: { specNeeds?: boolean } = {},
 ): Promise<PunctuationResult> {
   const output = await runAnalyzer<PunctuationModelError[]>({
-    output: Output.array({
-      element: punctuationSchema(essayText),
-    }),
+    output: "array",
+    schema: punctuationSchema(essayText),
     system: systemPrompt(),
     prompt: userPrompt(essayText),
-    reasoningEffort: "xhigh",
   });
 
   const punctuationErrors = positionPunctuationErrors(essayText, output);
@@ -53,7 +50,7 @@ function punctuationSchema(essayText: string) {
     fragment: essayFragment(essayText, "fragment", { minLength: 2 }),
     suggestion: z.string().min(2),
     reasoning: z.string(),
-    occurrence_index: z.number().int().min(1).optional(),
+    occurrence_index: z.number().int().min(1).nullable(),
   });
 }
 
@@ -65,7 +62,7 @@ export function positionPunctuationErrors(
     essayText,
     errors.map((error) => ({
       ...error,
-      occurrenceIndex: error.occurrence_index,
+      occurrenceIndex: error.occurrence_index ?? undefined,
     })),
   ).map((error) => {
     const {
@@ -120,7 +117,7 @@ Zasady:
 - "fragment" to cytat z tekstu zawierający błąd (minimum 2-3 słowa dla jednoznaczności).
 - "suggestion" to fragment po poprawce (z dodanym/usuniętym znakiem).
 - "reasoning" to krótkie wyjaśnienie po polsku, dlaczego to błąd interpunkcyjny.
-- "occurrence_index" to opcjonalny numer wystąpienia tego samego fragmentu w tekście, liczony od 1. Dodaj go tylko wtedy, gdy identyczny fragment występuje w tekście więcej niż raz.
+- "occurrence_index" to numer wystąpienia tego samego fragmentu w tekście, liczony od 1. Ustaw null, jeśli identyczny fragment nie występuje w tekście więcej niż raz.
 
 Przykłady:
 - Brak przecinka: fragment="smartfonów które", suggestion="smartfonów, które"

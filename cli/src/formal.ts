@@ -1,4 +1,3 @@
-import { Output } from "ai";
 import { z } from "zod";
 
 import { essayFragment, essayPrompt, runAnalyzer } from "./analyzer.js";
@@ -21,23 +20,32 @@ export type FormalResult = {
   points1: number;
 };
 
-type FormalModelOutput = Omit<FormalResult, "points1">;
+type FormalModelIssue = Omit<FormalIssue, "fragment"> & {
+  fragment: string | null;
+};
+
+type FormalModelOutput = Omit<FormalResult, "issues" | "points1"> & {
+  issues: FormalModelIssue[];
+};
 
 export async function analyzeFormalRequirements(
   essayText: string,
   context: EssayTaskContext = {},
 ): Promise<FormalResult> {
   const output = await runAnalyzer<FormalModelOutput>({
-    output: Output.object({
-      schema: formalSchema(essayText),
-    }),
+    schema: formalSchema(essayText),
     system: systemPrompt(context),
     prompt: userPrompt(essayText),
   });
 
-  return {
+  const normalizedOutput = {
     ...output,
-    points1: scoreFormalRequirements(output),
+    issues: normalizeFormalIssues(output.issues),
+  };
+
+  return {
+    ...normalizedOutput,
+    points1: scoreFormalRequirements(normalizedOutput),
   };
 }
 
@@ -51,11 +59,21 @@ function formalSchema(essayText: string) {
     issues: z.array(
       z.object({
         criterion: z.string(),
-        fragment: essayFragment(essayText, "fragment").optional(),
+        fragment: essayFragment(essayText, "fragment").nullable(),
         reasoning: z.string(),
       }),
     ),
     reasoning: z.string(),
+  });
+}
+
+function normalizeFormalIssues(issues: FormalModelIssue[]): FormalIssue[] {
+  return issues.map(({ fragment, ...issue }) => {
+    if (fragment === null) {
+      return issue;
+    }
+
+    return { ...issue, fragment };
   });
 }
 
@@ -93,7 +111,7 @@ Przyznaj 1 pkt tylko wtedy, gdy WSZYSTKIE warunki są spełnione:
 
 Zwróć:
 - noCardinalError, requiredReadingReferenced, addressesProblem, argumentative, planOrBulletForm,
-- issues: lista niespełnionych lub wątpliwych warunków; fragment podawaj tylko wtedy, gdy da się wskazać cytat z pracy,
+- issues: lista niespełnionych lub wątpliwych warunków; fragment ustaw na cytat z pracy albo null, jeśli nie da się wskazać cytatu,
 - reasoning: krótkie uzasadnienie po polsku.`;
 }
 

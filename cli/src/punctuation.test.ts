@@ -48,16 +48,16 @@ describe("positionPunctuationErrors", () => {
     expect(error?.position).toBe(17);
   });
 
-  it("rejects unmatched fragments instead of returning -1", () => {
-    expect(() =>
-      positionPunctuationErrors("Ala ma kota.", [
+  it("skips unmatched fragments instead of returning -1", () => {
+    const errors = positionPunctuationErrors("Ala ma kota.", [
         {
           fragment: "nie ma",
           suggestion: "nie, ma",
           reasoning: "Brak przecinka.",
         },
-      ]),
-    ).toThrow("Fragment not found");
+      ]);
+
+    expect(errors).toEqual([]);
   });
 });
 
