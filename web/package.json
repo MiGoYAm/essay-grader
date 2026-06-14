@@ -3,30 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "build:cli": "npm --prefix ../cli run build",
-    "dev": "npm run build:cli && vite dev --host 127.0.0.1",
-    "build": "npm run build:cli && vite build",
+    "build:cli": "pnpm --dir ../cli run build",
+    "dev": "pnpm run build:cli && vite dev --host 127.0.0.1",
+    "build": "pnpm run build:cli && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "typecheck": "npm run build:cli && tsc --noEmit"
+    "typecheck": "pnpm run build:cli && tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.100.14",
-    "@tanstack/react-router": "latest",
-    "@tanstack/react-start": "latest",
+    "@tanstack/react-query": "5.100.14",
+    "@tanstack/react-router": "1.170.8",
+    "@tanstack/react-start": "1.168.14",
     "dotenv": "17.2.3",
     "mature-ts": "file:../cli",
-    "react": "latest",
-    "react-dom": "latest"
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "latest",
-    "tailwindcss": "^4.3.0",
-    "typescript": "latest",
-    "vite": "latest"
+    "@tailwindcss/vite": "4.3.0",
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "tailwindcss": "4.3.0",
+    "typescript": "6.0.3",
+    "vite": "8.0.14"
   }
 }
